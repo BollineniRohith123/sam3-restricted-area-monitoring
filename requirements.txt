@@ -132,7 +132,6 @@ tqdm==4.67.1
 typing_extensions==4.12.2
 tzdata==2025.1
 git+https://github.com/facebookresearch/sam3.git
-torchvision-thop==2.0.14
 urllib3==2.3.0
 uvicorn==0.34.0
 watchdog==6.0.0
