@@ -6,20 +6,6 @@ from sam3.model_builder import build_sam3_video_predictor
 import torch
 import threading
 import random
-from datetime import datetime
-import os
-import time
-import pygame  # Import pygame for sound
-
-class ObjectMonitoringApp:
-    def __init__(self):
-        self.predictor = None
-
-    def draw_roi(self, frame):
-        """Draw an elliptical restricted area on the frame."""
-        height, width, _ = frame.shape
-        center = (width // 2, height // 2)
-        axes = (width // 4, height // 8)
         self.restricted_area = (center, axes)
         cv2.ellipse(frame, center, axes, 0, 0, 360, (0, 0, 255), 2)
         return frame
