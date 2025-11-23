@@ -2,7 +2,6 @@ fastapi
 streamlit
 opencv-python
 pandas
-git+https://github.com/facebookresearch/sam3.git
 torch
 torchvision
 pygame
