@@ -10,6 +10,7 @@ from datetime import datetime
 import os
 import time
 import pygame  # Import pygame for sound
+import tempfile
 
 class ObjectMonitoringApp:
     def __init__(self):
@@ -25,6 +26,9 @@ class ObjectMonitoringApp:
         self.alert_thread = None
         
         # Initialize CSV file if not exists
+        if not os.path.exists("data"):
+            os.makedirs("data")
+            
         if not os.path.exists(self.csv_file):
             pd.DataFrame(columns=["Timestamp", "Class", "Confidence", "Restricted Area Violation"]).to_csv(self.csv_file, index=False)
 
@@ -74,7 +78,7 @@ class ObjectMonitoringApp:
         """Start the webcam and SAM 3 session."""
         self.cap = cv2.VideoCapture(source)
         if not self.cap.isOpened():
-            st.error("Error: Unable to access the webcam.")
+            st.error(f"Error: Unable to access the video source: {source}. If running on a server, webcams (0) are not available. Please use a video file or RTSP stream.")
             return False
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
@@ -277,18 +281,31 @@ class ObjectMonitoringApp:
                 active_prompts.append(custom_prompt)
                 st.sidebar.success(f"Added: {custom_prompt}")
 
-        # Camera selection
-        camera_source = st.sidebar.text_input("Camera Source (0 for webcam, or RTSP URL)", "0")
+        # Input Source Selection
+        st.sidebar.markdown("### Video Source")
+        input_type = st.sidebar.radio("Select Input Type:", ["Upload Video", "RTSP/Webcam"])
+        
+        source = None
+        
+        if input_type == "Upload Video":
+            uploaded_file = st.sidebar.file_uploader("Upload a video file", type=["mp4", "avi", "mov"])
+            if uploaded_file is not None:
+                tfile = tempfile.NamedTemporaryFile(delete=False) 
+                tfile.write(uploaded_file.read())
+                source = tfile.name
+        else:
+            camera_source = st.sidebar.text_input("RTSP URL or Camera Index (0)", "0")
+            if camera_source.strip().isdigit():
+                source = int(camera_source)
+            else:
+                source = camera_source
         
         if st.sidebar.button("▶️ Start Monitoring"):
-            # Try to convert to int if it's a number
-            try:
-                source = int(camera_source)
-            except ValueError:
-                source = camera_source
-                
-            if self.start_webcam(source):
-                st.success("Monitoring started!")
+            if source is not None:
+                if self.start_webcam(source):
+                    st.success(f"Monitoring started using: {input_type}")
+            else:
+                st.error("Please provide a valid video source.")
 
         if st.sidebar.button("⏹️ Stop Webcam"):
             self.stop_webcam()
@@ -304,6 +321,11 @@ class ObjectMonitoringApp:
                     frame, _ = result
                     if frame is not None:
                         frame_placeholder.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), channels="RGB")
+                else:
+                    # End of video or error
+                    break
+            
+            self.stop_webcam()
 
 if __name__ == "__main__":
     app = ObjectMonitoringApp()
