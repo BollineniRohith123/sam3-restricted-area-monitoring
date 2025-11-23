@@ -6,6 +6,125 @@ from sam3.model_builder import build_sam3_video_predictor
 import torch
 import threading
 import random
+from datetime import datetime
+import os
+import time
+import pygame  # Import pygame for sound
+
+class ObjectMonitoringApp:
+    def __init__(self):
+        self.predictor = None
+        self.session_id = None
+        self.cap = None
+        self.restricted_area = None
+        self.csv_file = "data/detection_log.csv"
+        self.object_entry_times = {}
+
+        # Alert system
+        self.alert_active = False
+        self.alert_thread = None
+        
+        # Initialize CSV file if not exists
+        if not os.path.exists(self.csv_file):
+            pd.DataFrame(columns=["Timestamp", "Class", "Confidence", "Restricted Area Violation"]).to_csv(self.csv_file, index=False)
+
+        # Initialize pygame for sound
+        try:
+            pygame.mixer.init()
+            self.audio_enabled = True
+        except Exception as e:
+            print(f"Audio initialization failed (expected on server): {e}")
+            self.audio_enabled = False
+        
+        # Initialize SAM 3
+        self.initialize_sam3()
+
+    def initialize_sam3(self):
+        """Initialize SAM 3 predictor."""
+        try:
+            self.predictor = build_sam3_video_predictor()
+            st.toast("SAM 3 Initialized successfully!", icon="✅")
+        except Exception as e:
+            st.error(f"Failed to initialize SAM 3: {e}")
+
+    def start_sam3_session(self, source):
+        """Start a SAM 3 session with the video source."""
+        if self.predictor:
+            try:
+                # If source is an integer (webcam index), convert to string or handle appropriately
+                # SAM 3 might expect a path or URL. For webcam, we might need to rely on frame passing if supported.
+                # Assuming '0' works or we use the user's rtsp placeholder.
+                # For this implementation, we'll use the user's pattern.
+                resource_path = source if isinstance(source, str) else str(source)
+                
+                response = self.predictor.handle_request(
+                    request=dict(
+                        type="start_session",
+                        resource_path=resource_path, 
+                    )
+                )
+                self.session_id = response['session_id']
+                return True
+            except Exception as e:
+                st.error(f"Failed to start SAM 3 session: {e}")
+                return False
+        return False
+
+    def start_webcam(self, source=0):
+        """Start the webcam and SAM 3 session."""
+        self.cap = cv2.VideoCapture(source)
+        if not self.cap.isOpened():
+            st.error("Error: Unable to access the webcam.")
+            return False
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        
+        # Start SAM 3 session
+        # Note: If using webcam 0, SAM 3 might conflict if it tries to open it too.
+        # We will attempt to start the session.
+        self.start_sam3_session(source)
+        
+        return True
+
+    def stop_webcam(self):
+        """Stop the webcam."""
+        if self.cap:
+            self.cap.release()
+            cv2.destroyAllWindows()
+            self.cap = None
+            self.stop_alert()
+
+    def play_alert_sound(self, sound_path):
+        """Play alert sound in a loop while an object is inside the restricted area."""
+        if not self.audio_enabled:
+            return
+            
+        try:
+            pygame.mixer.music.load(sound_path)
+            pygame.mixer.music.play(-1)
+            while self.alert_active:
+                time.sleep(1)
+            pygame.mixer.music.stop()
+        except Exception as e:
+            print(f"Audio error: {e}")
+
+    def start_alert(self, sound_path):
+        """Start playing alert sound in a separate thread if not already playing."""
+        if not self.alert_active:
+            self.alert_active = True
+            self.alert_thread = threading.Thread(target=self.play_alert_sound, args=(sound_path,), daemon=True)
+            self.alert_thread.start()
+
+    def stop_alert(self):
+        """Stop the alert sound."""
+        if self.alert_active:
+            self.alert_active = False
+
+    def draw_roi(self, frame):
+        """Draw an elliptical restricted area on the frame."""
+        height, width, _ = frame.shape
+        center = (width // 2, height // 2)
+        axes = (width // 4, height // 8)
         self.restricted_area = (center, axes)
         cv2.ellipse(frame, center, axes, 0, 0, 360, (0, 0, 255), 2)
         return frame
