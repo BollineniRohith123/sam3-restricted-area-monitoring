@@ -7,3 +7,8 @@ torchvision
 pygame
 einops
 timm
+decord
+iopath
+pycocotools
+scikit-image
+scikit-learn
