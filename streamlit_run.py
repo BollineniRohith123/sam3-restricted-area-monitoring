@@ -14,24 +14,6 @@ import pygame  # Import pygame for sound
 class ObjectMonitoringApp:
     def __init__(self):
         self.predictor = None
-        self.session_id = None
-        self.cap = None
-        self.restricted_area = None
-        self.csv_file = "data/detection_log.csv"
-        self.object_entry_times = {}
-
-        # Alert system
-        self.alert_active = False
-        """Start playing alert sound in a separate thread if not already playing."""
-        if not self.alert_active:
-            self.alert_active = True
-            self.alert_thread = threading.Thread(target=self.play_alert_sound, args=(sound_path,), daemon=True)
-            self.alert_thread.start()
-
-    def stop_alert(self):
-        """Stop the alert sound."""
-        if self.alert_active:
-            self.alert_active = False
 
     def draw_roi(self, frame):
         """Draw an elliptical restricted area on the frame."""
